@@ -17,13 +17,14 @@ class Agent:
         self.optimizer = torch.optim.Adam(self.online_network.parameters(), lr=config.LR)
         self.epsilon = 1.0
 
-    def select_action(self, state):
+    def select_action(self, state, env, action_mask):
         if random.random() < self.epsilon:
-            action = random.randint(0, 6)
+            action = env.sample_action()
         else:
             with torch.no_grad():
                 state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
-                q_values = self.online_network(state_tensor)
+                q_values = self.online_network(state_tensor).squeeze(0)  # (7,)
+                q_values = q_values.masked_fill(~action_mask, float('-inf'))
                 action = torch.argmax(q_values).item()
         return action
 
@@ -56,8 +57,45 @@ class Agent:
         # Store in memory buffer
         self.memory_buffer.append((state_tensor, action_tensor, reward_tensor, next_state_tensor, done_tensor))
 
-    def update_network(self):
+    def update_target_network(self):
         self.target_network.load_state_dict(self.online_network.state_dict())
 
     def update_epsilon(self):
         self.epsilon = max(self.epsilon * config.EPSILON_DECAY, config.EPSILON_MIN)
+
+    def save(self, path):
+        torch.save({
+            "model": self.online_network.state_dict(),
+            "target_model": self.target_network.state_dict(),
+            "optimizer": self.optimizer.state_dict(),
+            "epsilon": self.epsilon,
+        }, path)
+
+    def load(self, path):
+        checkpoint = torch.load(path, map_location="cpu")
+
+        if isinstance(checkpoint, dict):
+            if "model" in checkpoint:
+                state_dict = checkpoint["model"]
+            elif "state_dict" in checkpoint:
+                state_dict = checkpoint["state_dict"]
+            elif all(isinstance(value, torch.Tensor) for value in checkpoint.values()):
+                state_dict = checkpoint
+            else:
+                raise ValueError(f"Unsupported checkpoint format in {path}")
+
+            self.online_network.load_state_dict(state_dict)
+
+            if isinstance(checkpoint, dict) and "target_model" in checkpoint:
+                self.target_network.load_state_dict(checkpoint["target_model"])
+            else:
+                self.update_target_network()
+
+            if isinstance(checkpoint, dict) and "optimizer" in checkpoint:
+                self.optimizer.load_state_dict(checkpoint["optimizer"])
+
+            if isinstance(checkpoint, dict) and "epsilon" in checkpoint:
+                self.epsilon = checkpoint["epsilon"]
+        else:
+            self.online_network.load_state_dict(checkpoint)
+            self.update_target_network()
