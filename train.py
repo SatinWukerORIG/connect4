@@ -1,7 +1,6 @@
 import random
 from collections import deque
 from pathlib import Path
-import time
 
 import torch
 import numpy as np
@@ -14,6 +13,7 @@ from agent import Agent
 env = environment.Connect4Env()
 agent = Agent()
 
+total_steps = 0
 for episode in range(10):
     state, _ = env.reset()
     episode_step = 0
@@ -33,8 +33,10 @@ for episode in range(10):
 
         done = terminated or truncated
 
-        
-        if len(agent.memory_buffer) >= config.BATCH_SIZE:
+        if total_steps % config.TARGET_UPDATE_FREQ == 0:
+            agent.update_network()
+
+        if len(agent.memory_buffer) >= config.MIN_REPLAY_SIZE:
             batch = random.sample(agent.memory_buffer, config.BATCH_SIZE)
             states, actions, rewards, next_states, dones = zip(*batch)
 
@@ -49,6 +51,7 @@ for episode in range(10):
         state = next_state
         total_reward += reward
         episode_step += 1
+        total_steps += 1
 
     print(f"Episode {episode + 1}/{config.EPISODES} - Steps: {episode_step}, Total Reward: {total_reward}")
 

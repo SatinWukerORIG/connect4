@@ -43,6 +43,8 @@ class Agent:
         loss.backward()
         self.optimizer.step()
 
+        self.update_epsilon()
+
     def store_experience(self, state, action, reward, next_state, done):
         # Convert to tensors
         state_tensor = torch.as_tensor(state, dtype=torch.float32)
