@@ -4,14 +4,17 @@ Follows the gymnasium interface (reset -> (obs, info), step -> (obs, reward,
 terminated, truncated, info)) without depending on gymnasium itself.
 
 Self-play convention: the board is always returned from the perspective of the
-player whose turn it is (+1 = me, -1 = opponent, 0 = empty), so a single network
-can play both seats. Rewards are given to the player that just moved.
+player whose turn it is, so a single network can play both seats. The
+observation is a (2, ROWS, COLS) float32 stack of 0/1 planes -- plane 0 holds
+the mover's pieces, plane 1 the opponent's -- ready to feed straight into a
+Conv2d(in_channels=2) model. Rewards are given to the player that just moved.
 """
 
 import numpy as np
 
 ROWS = 6
 COLS = 7
+PLANES = 2  # observation channels: [my pieces, opponent pieces]
 
 PLAYER = 1
 OPPONENT = -1
@@ -87,15 +90,15 @@ class Connect4Env:
 
     metadata = {"render_modes": [], "players": 2}
 
-    def __init__(self, rows=ROWS, cols=COLS, flatten=True, seed=None):
+    def __init__(self, rows=ROWS, cols=COLS, seed=None):
         self.rows = rows
         self.cols = cols
-        self.flatten = flatten
 
-        obs_shape = (rows * cols,) if flatten else (rows, cols)
-        self.observation_space = Box(-1.0, 1.0, obs_shape, np.float32, seed=seed)
+        obs_shape = (PLANES, rows, cols)
+        self.observation_space = Box(0.0, 1.0, obs_shape, np.float32, seed=seed)
         self.action_space = Discrete(cols, seed=seed)
 
+        self.state_shape = obs_shape
         self.state_dim = int(np.prod(obs_shape))
         self.action_dim = cols
 
@@ -187,7 +190,7 @@ class Connect4Env:
 
     def clone(self):
         """Deep copy of the env, e.g. for lookahead or evaluation rollouts."""
-        other = Connect4Env(self.rows, self.cols, self.flatten)
+        other = Connect4Env(self.rows, self.cols)
         other.board = self.board.copy()
         other.current_player = self.current_player
         other.move_count = self.move_count
@@ -224,9 +227,11 @@ class Connect4Env:
         return False
 
     def _observation(self):
-        """Board as seen by `current_player`: +1 theirs, -1 the opponent's."""
-        obs = (self.board * self.current_player).astype(np.float32)
-        return obs.reshape(-1) if self.flatten else obs
+        """(2, rows, cols) 0/1 planes: [mine, opponent's] for `current_player`."""
+        obs = np.empty((PLANES, self.rows, self.cols), dtype=np.float32)
+        obs[0] = self.board == self.current_player
+        obs[1] = self.board == -self.current_player
+        return obs
 
     def _info(self):
         return {

@@ -4,9 +4,10 @@
     python play.py --second              # let the agent open
     python play.py --agent dqn --checkpoint checkpoints/dqn.pt
 
-Agents only need an `act(obs, action_mask) -> int` method. `obs` is already
-flipped to the mover's perspective by the env, so the same agent plays either
-seat. Add a trained policy by pointing --checkpoint at its weights.
+Agents only need an `act(obs, action_mask) -> int` method. `obs` is the
+(2, 6, 7) plane stack from the env, already flipped to the mover's perspective,
+so the same agent plays either seat. Add a trained policy by pointing
+--checkpoint at its weights.
 """
 
 import argparse
@@ -54,14 +55,14 @@ class DQNAgent:
 
     name = "DQN"
 
-    def __init__(self, checkpoint, state_dim=42, action_dim=7, device="cpu"):
+    def __init__(self, checkpoint, device="cpu"):
         import torch  # imported lazily so the random agent needs no torch
 
         from model import Connect4Model
 
         self.torch = torch
         self.device = torch.device(device)
-        self.model = Connect4Model(state_dim, action_dim).to(self.device)
+        self.model = Connect4Model().to(self.device)
 
         blob = torch.load(checkpoint, map_location=self.device)
         if isinstance(blob, dict) and "model_state_dict" in blob:
@@ -100,7 +101,7 @@ def winning_cells(board, row, col):
 
 class Connect4GUI:
     def __init__(self, agent, human_first=True, seed=None):
-        self.env = Connect4Env(flatten=True, seed=seed)
+        self.env = Connect4Env(seed=seed)
         self.agent = agent
         self.human_player = 1 if human_first else -1
 
