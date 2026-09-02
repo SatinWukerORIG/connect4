@@ -7,8 +7,20 @@ import config
 import model
 
 class Agent:
-    def __init__(self):
+    def __init__(self, inference_only=False):
+        self.inference_only = inference_only
         self.online_network = model.Connect4Model()
+
+        if inference_only:
+            # Frozen opponent: it never learns, so skip the target network,
+            # the optimizer and the replay buffer.
+            self.online_network.eval()
+            self.target_network = None
+            self.optimizer = None
+            self.memory_buffer = None
+            self.epsilon = 0.0
+            return
+
         self.target_network = model.Connect4Model()
         self.target_network.load_state_dict(self.online_network.state_dict())
 
@@ -92,16 +104,20 @@ class Agent:
 
             self.online_network.load_state_dict(state_dict)
 
-            if isinstance(checkpoint, dict) and "target_model" in checkpoint:
+            if self.inference_only:
+                return
+
+            if "target_model" in checkpoint:
                 self.target_network.load_state_dict(checkpoint["target_model"])
             else:
                 self.update_target_network()
 
-            if isinstance(checkpoint, dict) and "optimizer" in checkpoint:
+            if "optimizer" in checkpoint:
                 self.optimizer.load_state_dict(checkpoint["optimizer"])
 
-            if isinstance(checkpoint, dict) and "epsilon" in checkpoint:
+            if "epsilon" in checkpoint:
                 self.epsilon = checkpoint["epsilon"]
         else:
             self.online_network.load_state_dict(checkpoint)
-            self.update_target_network()
+            if not self.inference_only:
+                self.update_target_network()

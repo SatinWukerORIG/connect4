@@ -10,3 +10,6 @@ LR = 0.001
 CHECKPOINT_DIR = "checkpoint"
 CHECKPOINT_PATH = None
 MAX_CHECKPOINTS = 10
+
+OPPONENT_POOL_SIZE = 8          # past-version opponents kept resident in memory
+OPPONENT_POOL_REFRESH_EVERY = 10  # re-scan the checkpoint dir every N draws
