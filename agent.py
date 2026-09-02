@@ -53,7 +53,7 @@ class Agent:
             next_q = next_q.masked_fill(~next_action_masks, float('-inf'))
             best_actions = next_q.argmax(dim=1, keepdim=True)
             best_next_q = self.target_network(next_states).gather(1, best_actions).squeeze(1)
-            target_q = rewards + config.GAMMA * best_next_q * (1 - dones)
+            target_q = rewards - config.GAMMA * best_next_q * (1 - dones)
 
         # Step 3: compute the loss and backprop using predicted and target Q-values
         loss = torch.nn.functional.smooth_l1_loss(predicted_q, target_q)
@@ -66,8 +66,6 @@ class Agent:
         )
 
         self.optimizer.step()
-
-        self.update_epsilon()
 
     def store_experience(self, state, action, reward, next_state, done, next_action_mask):
         # Convert to tensors
@@ -84,8 +82,9 @@ class Agent:
     def update_target_network(self):
         self.target_network.load_state_dict(self.online_network.state_dict())
 
-    def update_epsilon(self):
-        self.epsilon = max(self.epsilon * config.EPSILON_DECAY, config.EPSILON_MIN)
+    def update_epsilon(self, total_steps):
+        frac = min(1.0, total_steps / config.EPSILON_DECAY_STEPS)
+        self.epsilon = 1.0 + frac * (config.EPSILON_MIN - 1.0)
 
     def save(self, path):
         torch.save({

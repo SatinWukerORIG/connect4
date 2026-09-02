@@ -131,6 +131,7 @@ for episode in range(500):
 
             agent.train_step(states, actions, rewards, next_states, dones, next_action_masks)
 
+        agent.update_epsilon(total_steps)
         state = next_state
         episode_step += 1
         total_steps += 1
