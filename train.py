@@ -30,11 +30,11 @@ for episode in range(500):
         if episode_step % 2 == agent_first:
             action = agent.select_action(state, env, info["action_mask"])
             next_state, reward, terminated, truncated, info = env.step(action)
-            agent.store_experience(state, action, reward, next_state, terminated)
+            agent.store_experience(state, action, reward, next_state, terminated, info["action_mask"])
             episode_reward += reward
 
         else:
-            action = random.randint(0, 6)
+            action = env.sample_action()
             next_state, reward, terminated, truncated, info = env.step(action)
 
         done = terminated or truncated
@@ -44,15 +44,16 @@ for episode in range(500):
 
         if len(agent.memory_buffer) >= config.MIN_REPLAY_SIZE:
             batch = random.sample(agent.memory_buffer, config.BATCH_SIZE)
-            states, actions, rewards, next_states, dones = zip(*batch)
+            states, actions, rewards, next_states, dones, next_action_masks = zip(*batch)
 
             states = torch.stack(states)
             actions = torch.as_tensor(actions, dtype=torch.int64)
             rewards = torch.as_tensor(rewards, dtype=torch.float32)
             next_states = torch.stack(next_states)
             dones = torch.as_tensor(dones, dtype=torch.float32)
+            next_action_masks = torch.stack(next_action_masks)
 
-            agent.train_step(states, actions, rewards, next_states, dones)
+            agent.train_step(states, actions, rewards, next_states, dones, next_action_masks)
 
         state = next_state
         episode_step += 1

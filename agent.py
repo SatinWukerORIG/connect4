@@ -24,17 +24,22 @@ class Agent:
             with torch.no_grad():
                 state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
                 q_values = self.online_network(state_tensor).squeeze(0)  # (7,)
-                q_values = q_values.masked_fill(~action_mask, float('-inf'))
+                mask_tensor = torch.as_tensor(action_mask, dtype=torch.bool)
+                q_values = q_values.masked_fill(~mask_tensor, float('-inf'))
                 action = torch.argmax(q_values).item()
         return action
 
-    def train_step(self, states, actions, rewards, next_states, dones):
+    def train_step(self, states, actions, rewards, next_states, dones, next_action_masks):
         # Step 1: compute predicted Q-values for the current states and actions
         predicted_q = self.online_network(states).gather(1, actions.unsqueeze(1)).squeeze(1)
 
-        # Step 2: compute target Q-values for the next states
+        # Step 2: compute target Q-values for the next states. Only the online
+        # network's Q-values are masked -- masking the target network too would
+        # make a full board (every column illegal) produce -inf * 0 = NaN.
         with torch.no_grad():
-            best_actions = self.online_network(next_states).argmax(dim=1, keepdim=True)
+            next_q = self.online_network(next_states)
+            next_q = next_q.masked_fill(~next_action_masks, float('-inf'))
+            best_actions = next_q.argmax(dim=1, keepdim=True)
             best_next_q = self.target_network(next_states).gather(1, best_actions).squeeze(1)
             target_q = rewards + config.GAMMA * best_next_q * (1 - dones)
 
@@ -46,16 +51,17 @@ class Agent:
 
         self.update_epsilon()
 
-    def store_experience(self, state, action, reward, next_state, done):
+    def store_experience(self, state, action, reward, next_state, done, next_action_mask):
         # Convert to tensors
         state_tensor = torch.as_tensor(state, dtype=torch.float32)
         action_tensor = torch.as_tensor(action, dtype=torch.int64)
         reward_tensor = torch.as_tensor(reward, dtype=torch.float32)
         next_state_tensor = torch.as_tensor(next_state, dtype=torch.float32)
         done_tensor = torch.as_tensor(done, dtype=torch.float32)
+        next_mask_tensor = torch.as_tensor(next_action_mask, dtype=torch.bool)
 
         # Store in memory buffer
-        self.memory_buffer.append((state_tensor, action_tensor, reward_tensor, next_state_tensor, done_tensor))
+        self.memory_buffer.append((state_tensor, action_tensor, reward_tensor, next_state_tensor, done_tensor, next_mask_tensor))
 
     def update_target_network(self):
         self.target_network.load_state_dict(self.online_network.state_dict())
