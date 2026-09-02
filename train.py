@@ -6,6 +6,7 @@ import torch
 import numpy as np
 
 import config
+import eval
 import environment
 from agent import Agent
 
@@ -48,6 +49,7 @@ class OpponentPool:
     def sample(self):
         if self.draws % self.refresh_every == 0:
             self.paths = list(self.checkpoint_dir.glob("*.pth"))
+            self.paths = random.sample(self.paths, k=min(len(self.paths), config.MAX_CHECKPOINTS))
         self.draws += 1
 
         if not self.paths:
@@ -140,7 +142,7 @@ for episode in range(500):
         print(f"Episode {episode + 1} - Wins in last 50 episodes: {wins_per_50_ep}")
         if wins_per_50_ep > 26:
             checkpoint_path = Path(config.CHECKPOINT_DIR) / f"ep_{episode + 1}_{file_train_id}.pth"
-            torch.save(agent.online_network.state_dict(), checkpoint_path)
+            agent.save(checkpoint_path)
             print(f"Checkpoint saved at {checkpoint_path}")
             print()
         wins_per_50_ep = 0

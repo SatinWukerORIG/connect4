@@ -8,6 +8,14 @@ class Connect4Model(nn.Module):
         self.network = nn.Sequential(
             nn.Conv2d(
                 in_channels=2,
+                out_channels=32,
+                kernel_size=3,
+                padding=1
+            ),
+            nn.ReLU(),
+
+            nn.Conv2d(
+                in_channels=32,
                 out_channels=64,
                 kernel_size=3,
                 padding=1
@@ -16,6 +24,20 @@ class Connect4Model(nn.Module):
 
             nn.Conv2d(
                 in_channels=64,
+                out_channels=128,
+                kernel_size=3,
+                padding=1
+            ),
+            nn.ReLU(),
+            nn.Conv2d(
+                in_channels=128,
+                out_channels=128,
+                kernel_size=3,
+                padding=1
+            ),
+            nn.ReLU(),
+            nn.Conv2d(
+                in_channels=128,
                 out_channels=64,
                 kernel_size=3,
                 padding=1

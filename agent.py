@@ -24,7 +24,7 @@ class Agent:
         self.target_network = model.Connect4Model()
         self.target_network.load_state_dict(self.online_network.state_dict())
 
-        self.memory_buffer = deque(maxlen=50_000)
+        self.memory_buffer = deque(maxlen=config.MAX_REPLAY_SIZE)
 
         self.optimizer = torch.optim.Adam(self.online_network.parameters(), lr=config.LR)
         self.epsilon = 1.0
@@ -59,6 +59,12 @@ class Agent:
         loss = torch.nn.functional.smooth_l1_loss(predicted_q, target_q)
         self.optimizer.zero_grad()
         loss.backward()
+
+        torch.nn.utils.clip_grad_norm_(
+            self.online_network.parameters(),
+            max_norm=1.0
+        )
+
         self.optimizer.step()
 
         self.update_epsilon()
