@@ -101,18 +101,18 @@ for episode in range(500):
         if episode_step % 2 == agent_first:
             action = agent.select_action(state, env, info["action_mask"])
             next_state, reward, terminated, truncated, info = env.step(action)
-            agent.store_experience(state, action, reward, next_state, terminated, info["action_mask"])
             episode_reward += reward
 
         else:
             # 1. random opponent action
-            # action = env.sample_action()
+            action = env.sample_action()
 
             # 2. past version opponent action
-            action = opponent.select_action(state, env, info["action_mask"])
+            # action = opponent.select_action(state, env, info["action_mask"])
 
             next_state, reward, terminated, truncated, info = env.step(action)
 
+        agent.store_experience(state, action, reward, next_state, terminated, info["action_mask"])
         done = terminated or truncated
 
         if total_steps % config.TARGET_UPDATE_FREQ == 0:
