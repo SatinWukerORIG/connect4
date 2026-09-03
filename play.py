@@ -49,11 +49,13 @@ class RandomAgent:
 class DQNAgent:
     """Greedy policy from a trained Connect4Model checkpoint.
 
-    Accepts a bare state_dict or a dict with a "model_state_dict" key, which is
-    what a typical training loop saves.
+    Accepts a bare state_dict or a training checkpoint that wraps one -- Agent.save
+    stores it under "model", other loops use "model_state_dict" or "state_dict".
     """
 
     name = "DQN"
+
+    WEIGHT_KEYS = ("model", "model_state_dict", "state_dict")
 
     def __init__(self, checkpoint, device="cpu"):
         import torch  # imported lazily so the random agent needs no torch
@@ -65,8 +67,11 @@ class DQNAgent:
         self.model = Connect4Model().to(self.device)
 
         blob = torch.load(checkpoint, map_location=self.device)
-        if isinstance(blob, dict) and "model_state_dict" in blob:
-            blob = blob["model_state_dict"]
+        if isinstance(blob, dict):
+            for key in self.WEIGHT_KEYS:
+                if key in blob:
+                    blob = blob[key]
+                    break
         self.model.load_state_dict(blob)
         self.model.eval()
 
