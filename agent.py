@@ -90,6 +90,19 @@ class Agent:
         # Store in memory buffer
         self.memory_buffer.append((state_tensor, action_tensor, reward_tensor, next_state_tensor, done_tensor, next_mask_tensor))
 
+        # Connect 4 is symmetric left-to-right, so the mirrored board with the
+        # mirrored column played is an equally valid transition with the same
+        # reward. Storing it too doubles the data for free.
+        cols = state_tensor.shape[-1]
+        self.memory_buffer.append((
+            torch.flip(state_tensor, dims=[-1]),
+            torch.as_tensor(cols - 1 - action, dtype=torch.int64),
+            reward_tensor,
+            torch.flip(next_state_tensor, dims=[-1]),
+            done_tensor,
+            torch.flip(next_mask_tensor, dims=[-1]),
+        ))
+
     def update_target_network(self):
         self.target_network.load_state_dict(self.online_network.state_dict())
 
