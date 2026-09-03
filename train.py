@@ -163,7 +163,7 @@ for episode in range(1300):
             # print(f"Evaluation against best_model.pth: {eval_score}/50")
             print()
             # eval_score >= 26 and 
-            if wins_per_50_ep >= 15:
+            if wins_per_50_ep >= 10:
                 checkpoint_path = Path(config.CHECKPOINT_DIR) / f"ep_{episode + 1}_{file_train_id}_minimax.pth"
                 agent.save(checkpoint_path)
                 print(f"Checkpoint saved at {checkpoint_path}")
