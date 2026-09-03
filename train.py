@@ -9,11 +9,15 @@ import config
 import eval
 import environment
 from agent import Agent
+from minimax import MinimaxAgent
 
 print(f"training on {config.DEVICE}")
+train_against_random = False  # if False, train against past versions of the agent
+train_mode = "minimax"  # "random", "selfplay", or "minimax"
 
 env = environment.Connect4Env()
 agent = Agent()
+minimax_agent = MinimaxAgent(depth=4)
 if Path(config.CHECKPOINT_DIR).exists():
     if Path(f'{config.CHECKPOINT_DIR}/best_model.pth').exists():
         agent.load(f'{config.CHECKPOINT_DIR}/best_model.pth')
@@ -87,13 +91,14 @@ def choose_opponent(agent):
 file_train_id = random.randint(1000, 9999)
 wins_per_50_ep = 0
 total_steps = 0
-for episode in range(2000):
+for episode in range(1000):
     state, info = env.reset()
     episode_step = 1
     episode_reward = 0
     agent_first = random.randint(0, 1)
 
-    opponent = choose_opponent(agent)
+    if train_mode == 'selfplay':
+        opponent = choose_opponent(agent)
 
     done = False
     while not done:
@@ -104,11 +109,15 @@ for episode in range(2000):
             episode_reward += reward
 
         else:
-            # 1. random opponent action
-            # action = env.sample_action()
-
-            # 2. past version opponent action
-            action = opponent.select_action(state, env, info["action_mask"])
+            if train_mode == 'random':
+                # 1. random opponent action
+                action = env.sample_action()
+            elif train_mode == 'minimax':
+                # 2. minimax opponent action
+                action = minimax_agent.select_action(state, env, info["action_mask"])
+            else:
+                # 3. past version opponent action
+                action = opponent.select_action(state, env, info["action_mask"])
 
             next_state, reward, terminated, truncated, info = env.step(action)
 
@@ -142,20 +151,21 @@ for episode in range(2000):
     if (episode + 1) % 50 == 0:
         print(f"Episode {episode + 1} - Wins in last 50 episodes: {wins_per_50_ep}")
         print(f"epsilon: {agent.epsilon:.4f}, total_steps: {total_steps}, memory_buffer size: {len(agent.memory_buffer)}")
-        print(f"Opponent pool size: {len(opponent_pool.loaded)}")
-        # if wins_per_50_ep > 40:
-        #     checkpoint_path = Path(config.CHECKPOINT_DIR) / f"ep_{episode + 1}_{file_train_id}.pth"
-        #     agent.save(checkpoint_path)
-        #     print(f"Checkpoint saved at {checkpoint_path}")
-        #     print()
-        eval_score = eval.evaluate(agent)
-        print(f"Evaluation against best_model.pth: {eval_score}/50")
-        print()
-        if eval_score >= 35 and wins_per_50_ep >= 30:
-            checkpoint_path = Path(config.CHECKPOINT_DIR) / f"ep_{episode + 1}_{file_train_id}_{eval_score}.pth"
-            agent.save(checkpoint_path)
-            print(f"Checkpoint saved at {checkpoint_path}")
+        if train_against_random:
+            if wins_per_50_ep > 40:
+                checkpoint_path = Path(config.CHECKPOINT_DIR) / f"ep_{episode + 1}_{file_train_id}.pth"
+                agent.save(checkpoint_path)
+                print(f"Checkpoint saved at {checkpoint_path}")
+                print()
+        else:
+            eval_score = eval.evaluate(agent)
+            print(f"Opponent pool size: {len(opponent_pool.loaded)}")
+            print(f"Evaluation against best_model.pth: {eval_score}/50")
             print()
+            if eval_score >= 35 and wins_per_50_ep >= 30:
+                checkpoint_path = Path(config.CHECKPOINT_DIR) / f"ep_{episode + 1}_{file_train_id}_{eval_score}.pth"
+                agent.save(checkpoint_path)
+                print(f"Checkpoint saved at {checkpoint_path}")
+                print()
         wins_per_50_ep = 0
 
-    # print(f"Episode {episode + 1} - Steps: {episode_step}, Total Reward: {episode_reward}, ")

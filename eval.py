@@ -1,7 +1,9 @@
 """Benchmark the training agent against a pool of saved checkpoints.
 
-Each game draws a random opponent from `eval_checkpoint/`, so the score covers a
-mix of past versions instead of a single one. Call it from the training loop:
+Half the games are played against a fixed-strength minimax agent, the other half
+against a random opponent drawn from `eval_checkpoint/`, so the score covers both
+absolute strength and progress against past versions. Call it from the training
+loop:
 
     wins = evaluate(agent)
     print(f"{wins}/50 vs the eval pool")
@@ -11,11 +13,15 @@ import random
 from pathlib import Path
 
 import environment
+import minimax
 from agent import Agent
 
 EVAL_CHECKPOINT_DIR = Path("eval_checkpoint")
 
+MINIMAX_DEPTH = 4  # search depth of the minimax half of the pool
+
 _opponents = {}  # path -> Agent, so checkpoints are read from disk only once
+_minimax_opponent = minimax.MinimaxAgent(depth=MINIMAX_DEPTH)
 
 
 class _RandomOpponent:
@@ -36,10 +42,10 @@ def _load_opponent(path):
 def evaluate(agent, games=50, opponent=None):
     """Play `games` greedy games against the eval pool; return the agent's wins.
 
-    A fresh opponent is drawn from `eval_checkpoint/` for each game -- pass
-    `opponent` to face one fixed player instead. The agent takes each seat for
-    half the games, since moving first is an advantage. Draws and losses both
-    count as "not a win".
+    Half the games face the minimax agent; the other half face a fresh opponent
+    drawn from `eval_checkpoint/` -- pass `opponent` to face one fixed player for
+    every game instead. The agent takes each seat for half the games, since
+    moving first is an advantage. Draws and losses both count as "not a win".
     """
     paths = sorted(EVAL_CHECKPOINT_DIR.glob("*.pth"))
 
@@ -50,8 +56,14 @@ def evaluate(agent, games=50, opponent=None):
 
     try:
         for game in range(games):
+            # Alternate opponent type every two games, so each of them is faced
+            # from both seats equally often.
+            use_minimax = (game // 2) % 2 == 0
+
             if opponent is not None:
                 rival = opponent
+            elif use_minimax:
+                rival = _minimax_opponent
             elif paths:
                 rival = _load_opponent(random.choice(paths))
             else:
