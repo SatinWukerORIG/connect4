@@ -6,6 +6,7 @@ import torch
 import numpy as np
 
 import config
+import eval
 import environment
 from agent import Agent
 
@@ -141,8 +142,17 @@ for episode in range(2000):
     if (episode + 1) % 50 == 0:
         print(f"Episode {episode + 1} - Wins in last 50 episodes: {wins_per_50_ep}")
         print(f"epsilon: {agent.epsilon:.4f}, total_steps: {total_steps}, memory_buffer size: {len(agent.memory_buffer)}")
-        if wins_per_50_ep > 40:
-            checkpoint_path = Path(config.CHECKPOINT_DIR) / f"ep_{episode + 1}_{file_train_id}.pth"
+        print(f"Opponent pool size: {len(opponent_pool.loaded)}")
+        # if wins_per_50_ep > 40:
+        #     checkpoint_path = Path(config.CHECKPOINT_DIR) / f"ep_{episode + 1}_{file_train_id}.pth"
+        #     agent.save(checkpoint_path)
+        #     print(f"Checkpoint saved at {checkpoint_path}")
+        #     print()
+        eval_score = eval.evaluate(agent)
+        print(f"Evaluation against best_model.pth: {eval_score}/50")
+        print()
+        if eval_score >= 35:
+            checkpoint_path = Path(config.CHECKPOINT_DIR) / f"ep_{episode + 1}_{file_train_id}_{eval_score}.pth"
             agent.save(checkpoint_path)
             print(f"Checkpoint saved at {checkpoint_path}")
             print()
