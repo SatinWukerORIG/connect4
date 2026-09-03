@@ -1,49 +1,47 @@
-"""Benchmark the training agent against the saved best model.
+"""Benchmark the training agent against a pool of saved checkpoints.
 
-Call `evaluate(agent)` from the training loop to see how the agent is doing
-against `checkpoint/best_model.pth`:
+Each game draws a random opponent from `eval_checkpoint/`, so the score covers a
+mix of past versions instead of a single one. Call it from the training loop:
 
     wins = evaluate(agent)
-    print(f"{wins}/50 vs best_model")
+    print(f"{wins}/50 vs the eval pool")
 """
 
+import random
 from pathlib import Path
 
-import config
 import environment
 from agent import Agent
 
-BEST_MODEL = Path(config.CHECKPOINT_DIR) / "best_model.pth"
+EVAL_CHECKPOINT_DIR = Path("eval_checkpoint")
 
-_opponent = None  # loaded once, not re-read on every call
+_opponents = {}  # path -> Agent, so checkpoints are read from disk only once
 
 
 class _RandomOpponent:
-    """Stand-in for before best_model.pth exists."""
+    """Stand-in for when the eval folder is empty."""
 
     def select_action(self, state, env, action_mask):
         return env.sample_action()
 
 
-def _best_opponent():
-    global _opponent
-    if _opponent is None:
-        if BEST_MODEL.exists():
-            _opponent = Agent(inference_only=True)
-            _opponent.load(BEST_MODEL)
-        else:
-            _opponent = _RandomOpponent()
-    return _opponent
+def _load_opponent(path):
+    if path not in _opponents:
+        opponent = Agent(inference_only=True)
+        opponent.load(path)
+        _opponents[path] = opponent
+    return _opponents[path]
 
 
 def evaluate(agent, games=50, opponent=None):
-    """Play `games` greedy games against best_model.pth; return the agent's wins.
+    """Play `games` greedy games against the eval pool; return the agent's wins.
 
-    The agent takes each seat for half the games, since moving first is an
-    advantage. Draws and losses both count as "not a win".
+    A fresh opponent is drawn from `eval_checkpoint/` for each game -- pass
+    `opponent` to face one fixed player instead. The agent takes each seat for
+    half the games, since moving first is an advantage. Draws and losses both
+    count as "not a win".
     """
-    if opponent is None:
-        opponent = _best_opponent()
+    paths = sorted(EVAL_CHECKPOINT_DIR.glob("*.pth"))
 
     env = environment.Connect4Env()
     saved_epsilon = agent.epsilon
@@ -52,11 +50,18 @@ def evaluate(agent, games=50, opponent=None):
 
     try:
         for game in range(games):
+            if opponent is not None:
+                rival = opponent
+            elif paths:
+                rival = _load_opponent(random.choice(paths))
+            else:
+                rival = _RandomOpponent()
+
             agent_player = 1 if game % 2 == 0 else -1
             state, info = env.reset()
 
             while True:
-                mover = agent if env.current_player == agent_player else opponent
+                mover = agent if env.current_player == agent_player else rival
                 action = mover.select_action(state, env, info["action_mask"])
                 state, _reward, terminated, truncated, info = env.step(action)
 
@@ -70,6 +75,8 @@ def evaluate(agent, games=50, opponent=None):
 
 
 if __name__ == "__main__":
+    import config
+
     agent = Agent()
-    agent.load(BEST_MODEL)
-    print(f"{evaluate(agent)}/50 wins vs best_model")
+    agent.load(f"{config.CHECKPOINT_DIR}/best_model.pth")
+    print(f"{evaluate(agent)}/50 wins vs the eval pool")

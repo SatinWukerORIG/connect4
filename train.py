@@ -151,7 +151,7 @@ for episode in range(2000):
         eval_score = eval.evaluate(agent)
         print(f"Evaluation against best_model.pth: {eval_score}/50")
         print()
-        if eval_score >= 35:
+        if eval_score >= 35 and wins_per_50_ep >= 30:
             checkpoint_path = Path(config.CHECKPOINT_DIR) / f"ep_{episode + 1}_{file_train_id}_{eval_score}.pth"
             agent.save(checkpoint_path)
             print(f"Checkpoint saved at {checkpoint_path}")
