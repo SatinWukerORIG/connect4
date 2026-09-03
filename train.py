@@ -17,7 +17,7 @@ train_mode = "minimax"  # "random", "selfplay", or "minimax"
 
 env = environment.Connect4Env()
 agent = Agent()
-minimax_agent = MinimaxAgent(depth=2)
+minimax_agent = MinimaxAgent(depth=4)
 if Path(config.CHECKPOINT_DIR).exists():
     if Path(f'{config.CHECKPOINT_DIR}/best_model.pth').exists():
         agent.load(f'{config.CHECKPOINT_DIR}/best_model.pth')
