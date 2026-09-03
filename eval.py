@@ -18,7 +18,7 @@ from agent import Agent
 
 EVAL_CHECKPOINT_DIR = Path("eval_checkpoint")
 
-MINIMAX_DEPTH = 4  # search depth of the minimax half of the pool
+MINIMAX_DEPTH = 3  # search depth of the minimax half of the pool
 
 _opponents = {}  # path -> Agent, so checkpoints are read from disk only once
 _minimax_opponent = minimax.MinimaxAgent(depth=MINIMAX_DEPTH)
@@ -58,12 +58,12 @@ def evaluate(agent, games=50, opponent=None):
         for game in range(games):
             # Alternate opponent type every two games, so each of them is faced
             # from both seats equally often.
-            use_minimax = (game // 2) % 2 == 0
+            # use_minimax = (game // 2) % 2 == 0
 
             if opponent is not None:
                 rival = opponent
-            elif use_minimax:
-                rival = _minimax_opponent
+            # elif use_minimax:
+            #     rival = _minimax_opponent
             elif paths:
                 rival = _load_opponent(random.choice(paths))
             else:

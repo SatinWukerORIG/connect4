@@ -17,7 +17,7 @@ train_mode = "minimax"  # "random", "selfplay", or "minimax"
 
 env = environment.Connect4Env()
 agent = Agent()
-minimax_agent = MinimaxAgent(depth=4)
+minimax_agent = MinimaxAgent(depth=2)
 if Path(config.CHECKPOINT_DIR).exists():
     if Path(f'{config.CHECKPOINT_DIR}/best_model.pth').exists():
         agent.load(f'{config.CHECKPOINT_DIR}/best_model.pth')
@@ -91,7 +91,7 @@ def choose_opponent(agent):
 file_train_id = random.randint(1000, 9999)
 wins_per_50_ep = 0
 total_steps = 0
-for episode in range(1000):
+for episode in range(1300):
     state, info = env.reset()
     episode_step = 1
     episode_reward = 0
@@ -158,12 +158,13 @@ for episode in range(1000):
                 print(f"Checkpoint saved at {checkpoint_path}")
                 print()
         else:
-            eval_score = eval.evaluate(agent)
+            # eval_score = eval.evaluate(agent)
             print(f"Opponent pool size: {len(opponent_pool.loaded)}")
-            print(f"Evaluation against best_model.pth: {eval_score}/50")
+            # print(f"Evaluation against best_model.pth: {eval_score}/50")
             print()
-            if eval_score >= 35 and wins_per_50_ep >= 30:
-                checkpoint_path = Path(config.CHECKPOINT_DIR) / f"ep_{episode + 1}_{file_train_id}_{eval_score}.pth"
+            # eval_score >= 26 and 
+            if wins_per_50_ep >= 15:
+                checkpoint_path = Path(config.CHECKPOINT_DIR) / f"ep_{episode + 1}_{file_train_id}_minimax.pth"
                 agent.save(checkpoint_path)
                 print(f"Checkpoint saved at {checkpoint_path}")
                 print()
