@@ -6,7 +6,6 @@ import torch
 import numpy as np
 
 import config
-import eval
 import environment
 from agent import Agent
 
@@ -87,13 +86,13 @@ def choose_opponent(agent):
 file_train_id = random.randint(1000, 9999)
 wins_per_50_ep = 0
 total_steps = 0
-for episode in range(500):
+for episode in range(2000):
     state, info = env.reset()
     episode_step = 1
     episode_reward = 0
     agent_first = random.randint(0, 1)
 
-    opponent = choose_opponent(agent)
+    # opponent = choose_opponent(agent)
 
     done = False
     while not done:
@@ -141,7 +140,8 @@ for episode in range(500):
         wins_per_50_ep += 1
     if (episode + 1) % 50 == 0:
         print(f"Episode {episode + 1} - Wins in last 50 episodes: {wins_per_50_ep}")
-        if wins_per_50_ep > 26:
+        print(f"epsilon: {agent.epsilon:.4f}, total_steps: {total_steps}, memory_buffer size: {len(agent.memory_buffer)}")
+        if wins_per_50_ep > 40:
             checkpoint_path = Path(config.CHECKPOINT_DIR) / f"ep_{episode + 1}_{file_train_id}.pth"
             agent.save(checkpoint_path)
             print(f"Checkpoint saved at {checkpoint_path}")

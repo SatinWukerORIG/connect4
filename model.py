@@ -1,5 +1,22 @@
-import torch
 import torch.nn as nn
+
+
+class ResidualBlock(nn.Module):
+    def __init__(self, channels):
+        super().__init__()
+        self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
+        self.relu = nn.ReLU()
+        self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
+
+    def forward(self, x):
+        residual = x
+
+        out = self.conv1(x)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.relu(out + residual)
+        return out
 
 class Connect4Model(nn.Module):
     def __init__(self):
@@ -8,41 +25,15 @@ class Connect4Model(nn.Module):
         self.network = nn.Sequential(
             nn.Conv2d(
                 in_channels=2,
-                out_channels=32,
-                kernel_size=3,
-                padding=1
-            ),
-            nn.ReLU(),
-
-            nn.Conv2d(
-                in_channels=32,
                 out_channels=64,
                 kernel_size=3,
                 padding=1
             ),
             nn.ReLU(),
 
-            nn.Conv2d(
-                in_channels=64,
-                out_channels=128,
-                kernel_size=3,
-                padding=1
-            ),
-            nn.ReLU(),
-            nn.Conv2d(
-                in_channels=128,
-                out_channels=128,
-                kernel_size=3,
-                padding=1
-            ),
-            nn.ReLU(),
-            nn.Conv2d(
-                in_channels=128,
-                out_channels=64,
-                kernel_size=3,
-                padding=1
-            ),
-            nn.ReLU(),
+            ResidualBlock(64),
+            ResidualBlock(64),
+            ResidualBlock(64),
 
             nn.Flatten(),
 
