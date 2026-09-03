@@ -35,6 +35,39 @@ where it stopped.
 
 Knobs live in `config.py`. The episode count is hardcoded at `train.py:89`.
 
+### GPU
+
+`config.DEVICE` picks CUDA, then Apple MPS, then CPU, and the agent puts both networks there. The replay
+buffer stays on the CPU; only the sampled batch is moved each step. Force a device with an env var:
+
+```
+DEVICE=cpu python3 train.py
+```
+
+### Training on Colab
+
+Pick **Runtime → Change runtime type → T4 GPU**, then in a cell:
+
+```python
+!git clone https://github.com/<you>/connect4.git
+%cd connect4
+!python train.py          # prints "training on cuda"
+```
+
+Checkpoints land in `checkpoint/` inside the VM and disappear when it recycles, so copy them out —
+either mount Drive first and point `CHECKPOINT_DIR` at it:
+
+```python
+from google.colab import drive; drive.mount('/content/drive')
+```
+```python
+# config.py
+CHECKPOINT_DIR = "/content/drive/MyDrive/connect4/checkpoint"
+```
+
+or download at the end with `files.download("checkpoint/ep_2000_1234.pth")`. Bring the `.pth` back to
+this repo and play it locally as usual — `play.py` maps CUDA tensors onto the CPU on load.
+
 `train.py` also contains an opponent pool that samples past checkpoints to play against instead of a
 random opponent — it's wired up but currently commented out at lines 95 and 110.
 

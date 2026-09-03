@@ -1,3 +1,19 @@
+import os
+
+import torch
+
+
+def _default_device():
+    """CUDA on Colab, MPS on an Apple GPU, else CPU. Override with DEVICE=cpu."""
+    if torch.cuda.is_available():
+        return "cuda"
+    if torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
+
+DEVICE = os.environ.get("DEVICE") or _default_device()
+
 EPISODES = 600
 BATCH_SIZE = 64
 MIN_REPLAY_SIZE = 500

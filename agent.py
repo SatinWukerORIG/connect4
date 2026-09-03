@@ -7,9 +7,10 @@ import config
 import model
 
 class Agent:
-    def __init__(self, inference_only=False):
+    def __init__(self, inference_only=False, device=None):
         self.inference_only = inference_only
-        self.online_network = model.Connect4Model()
+        self.device = torch.device(device or config.DEVICE)
+        self.online_network = model.Connect4Model().to(self.device)
 
         if inference_only:
             # Frozen opponent: it never learns, so skip the target network,
@@ -21,7 +22,7 @@ class Agent:
             self.epsilon = 0.0
             return
 
-        self.target_network = model.Connect4Model()
+        self.target_network = model.Connect4Model().to(self.device)
         self.target_network.load_state_dict(self.online_network.state_dict())
 
         self.memory_buffer = deque(maxlen=config.MAX_REPLAY_SIZE)
@@ -34,14 +35,24 @@ class Agent:
             action = env.sample_action()
         else:
             with torch.no_grad():
-                state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+                state_tensor = torch.as_tensor(
+                    state, dtype=torch.float32, device=self.device
+                ).unsqueeze(0)
                 q_values = self.online_network(state_tensor).squeeze(0)  # (7,)
-                mask_tensor = torch.as_tensor(action_mask, dtype=torch.bool)
+                mask_tensor = torch.as_tensor(action_mask, dtype=torch.bool, device=self.device)
                 q_values = q_values.masked_fill(~mask_tensor, float('-inf'))
                 action = torch.argmax(q_values).item()
         return action
 
     def train_step(self, states, actions, rewards, next_states, dones, next_action_masks):
+        # The replay buffer lives on the CPU; only the sampled batch goes to the GPU.
+        states = states.to(self.device)
+        actions = actions.to(self.device)
+        rewards = rewards.to(self.device)
+        next_states = next_states.to(self.device)
+        dones = dones.to(self.device)
+        next_action_masks = next_action_masks.to(self.device)
+
         # Step 1: compute predicted Q-values for the current states and actions
         predicted_q = self.online_network(states).gather(1, actions.unsqueeze(1)).squeeze(1)
 
@@ -95,7 +106,7 @@ class Agent:
         }, path)
 
     def load(self, path):
-        checkpoint = torch.load(path, map_location="cpu")
+        checkpoint = torch.load(path, map_location=self.device)
 
         if isinstance(checkpoint, dict):
             if "model" in checkpoint:

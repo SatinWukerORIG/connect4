@@ -9,7 +9,7 @@ import config
 import environment
 from agent import Agent
 
-print(torch.cuda.is_available())
+print(f"training on {config.DEVICE}")
 
 env = environment.Connect4Env()
 agent = Agent()
@@ -92,7 +92,7 @@ for episode in range(2000):
     episode_reward = 0
     agent_first = random.randint(0, 1)
 
-    # opponent = choose_opponent(agent)
+    opponent = choose_opponent(agent)
 
     done = False
     while not done:
@@ -104,10 +104,10 @@ for episode in range(2000):
 
         else:
             # 1. random opponent action
-            action = env.sample_action()
+            # action = env.sample_action()
 
             # 2. past version opponent action
-            # action = opponent.select_action(state, env, info["action_mask"])
+            action = opponent.select_action(state, env, info["action_mask"])
 
             next_state, reward, terminated, truncated, info = env.step(action)
 
