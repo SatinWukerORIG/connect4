@@ -7,8 +7,9 @@ import config
 import model
 
 class Agent:
-    def __init__(self, inference_only=False, device=None):
+    def __init__(self, inference_only=False, device=None, epsilon_start=None):
         self.inference_only = inference_only
+        self.epsilon_start = config.EPSILON_START if epsilon_start is None else epsilon_start
         self.device = torch.device(device or config.DEVICE)
         self.online_network = model.Connect4Model().to(self.device)
 
@@ -19,6 +20,7 @@ class Agent:
             self.target_network = None
             self.optimizer = None
             self.memory_buffer = None
+            self.epsilon_start = 0.0
             self.epsilon = 0.0
             return
 
@@ -28,7 +30,7 @@ class Agent:
         self.memory_buffer = deque(maxlen=config.MAX_REPLAY_SIZE)
 
         self.optimizer = torch.optim.Adam(self.online_network.parameters(), lr=config.LR)
-        self.epsilon = 1.0
+        self.epsilon = self.epsilon_start
 
     def select_action(self, state, env, action_mask):
         if random.random() < self.epsilon:
@@ -108,7 +110,7 @@ class Agent:
 
     def update_epsilon(self, total_steps):
         frac = min(1.0, total_steps / config.EPSILON_DECAY_STEPS)
-        self.epsilon = 0.05 + frac * (config.EPSILON_MIN - 0.05)
+        self.epsilon = self.epsilon_start + frac * (config.EPSILON_MIN - self.epsilon_start)
 
     def save(self, path):
         torch.save({

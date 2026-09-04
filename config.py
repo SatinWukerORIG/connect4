@@ -22,7 +22,11 @@ TARGET_UPDATE_FREQ = 500
 
 GAMMA = 0.99
 EPSILON_DECAY_STEPS = 20_000
+EPSILON_START = 0.05
 EPSILON_MIN = 0.005
+
+TOTAL_STEPS = 200_000  # env steps per training run
+TRAIN_MODE = "minimax"  # "random", "selfplay", or "minimax"
 LR = 1e-4
 CHECKPOINT_DIR = "checkpoint"
 CHECKPOINT_PATH = None

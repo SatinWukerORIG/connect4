@@ -1,3 +1,5 @@
+import argparse
+import itertools
 import random
 from collections import OrderedDict, deque
 from pathlib import Path
@@ -11,13 +13,51 @@ import environment
 from agent import Agent
 from minimax import MinimaxAgent
 
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train the Connect 4 DQN agent.")
+    parser.add_argument(
+        "--total-steps",
+        type=int,
+        default=config.TOTAL_STEPS,
+        help="environment steps to train for; the run ends after the episode "
+             "that crosses this count (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--train-mode",
+        choices=("random", "selfplay", "minimax"),
+        default=config.TRAIN_MODE,
+        help="opponent to train against: 'random' plays uniformly random moves, "
+             "'selfplay' plays the current net or a past checkpoint, 'minimax' is "
+             "selfplay with 20%% of the opponent moves taken by minimax "
+             "(default: %(default)s)",
+    )
+    parser.add_argument(
+        "--initial-epsilon",
+        type=float,
+        default=config.EPSILON_START,
+        help="exploration rate at step 0, decayed linearly to EPSILON_MIN over "
+             "EPSILON_DECAY_STEPS (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--minimax-depth",
+        type=int,
+        default=4,
+        help="search depth of the minimax opponent (default: %(default)s)",
+    )
+    return parser.parse_args()
+
+
+args = parse_args()
+train_mode = args.train_mode
+
 print(f"training on {config.DEVICE}")
-train_against_random = False  # if False, train against past versions of the agent
-train_mode = "minimax"  # "random", "selfplay", or "minimax"
+print(f"train_mode: {train_mode}, total_steps: {args.total_steps}, "
+      f"initial epsilon: {args.initial_epsilon}")
 
 env = environment.Connect4Env()
-agent = Agent()
-minimax_agent = MinimaxAgent(depth=4)
+agent = Agent(epsilon_start=args.initial_epsilon)
+minimax_agent = MinimaxAgent(depth=args.minimax_depth)
 if Path(config.CHECKPOINT_DIR).exists():
     if Path(f'{config.CHECKPOINT_DIR}/best_model.pth').exists():
         agent.load(f'{config.CHECKPOINT_DIR}/best_model.pth')
@@ -91,14 +131,16 @@ def choose_opponent(agent):
 file_train_id = random.randint(1000, 9999)
 wins_per_50_ep = 0
 total_steps = 0
-for episode in range(10000):
+for episode in itertools.count():
+    if total_steps >= args.total_steps:
+        break
+
     state, info = env.reset()
     episode_step = 1
     episode_reward = 0
     agent_first = random.randint(0, 1)
 
-    # if train_mode == 'selfplay':
-    opponent = choose_opponent(agent)
+    opponent = None if train_mode == 'random' else choose_opponent(agent)
 
     done = False
     while not done:
@@ -112,17 +154,12 @@ for episode in range(10000):
             if train_mode == 'random':
                 # 1. random opponent action
                 action = env.sample_action()
-            # elif train_mode == 'minimax':
-            #     # 2. minimax opponent action
-            #     action = minimax_agent.select_action(state, env, info["action_mask"])
-            # else:
-            #     # 3. past version opponent action
-            #     action = opponent.select_action(state, env, info["action_mask"])
-            if random.random() < 0.2:
-                # 2. minimax opponent action
+            elif train_mode == 'minimax' and random.random() < 0.2:
+                # 2. minimax opponent action. Search is slow, so it only takes a
+                # fifth of the moves; the rest still come from the pool.
                 action = minimax_agent.select_action(state, env, info["action_mask"])
             else:
-                # 3. past version opponent action
+                # 3. current-net or past-version opponent action
                 action = opponent.select_action(state, env, info["action_mask"])
 
             next_state, reward, terminated, truncated, info = env.step(action)
@@ -157,7 +194,7 @@ for episode in range(10000):
     if (episode + 1) % 50 == 0:
         print(f"Episode {episode + 1} - Wins in last 50 episodes: {wins_per_50_ep}")
         print(f"epsilon: {agent.epsilon:.4f}, total_steps: {total_steps}, memory_buffer size: {len(agent.memory_buffer)}")
-        if train_against_random:
+        if train_mode == 'random':
             if wins_per_50_ep > 40:
                 checkpoint_path = Path(config.CHECKPOINT_DIR) / f"ep_{episode + 1}_{file_train_id}.pth"
                 agent.save(checkpoint_path)
@@ -175,9 +212,11 @@ for episode in range(10000):
             print()
 
             if pool_pct > 70 and minimax_pct >= 50:
-                checkpoint_path = Path(config.CHECKPOINT_DIR) / f"ep_{episode + 1}_{file_train_id}_minimax.pth"
+                checkpoint_path = Path(config.CHECKPOINT_DIR) / f"ep_{episode + 1}_{file_train_id}_{train_mode}.pth"
                 agent.save(checkpoint_path)
                 print(f"Checkpoint saved at {checkpoint_path}")
                 print()
         wins_per_50_ep = 0
+
+print(f"Training finished after {episode} episodes / {total_steps} steps.")
 
