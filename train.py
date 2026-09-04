@@ -83,7 +83,7 @@ opponent_pool = OpponentPool(
 def choose_opponent(agent):
     # play against past version.
     # 80% current network, 20% a past checkpoint (random actions until one exists)
-    if random.random() < 0.8:
+    if random.random() < 0.5:
         return agent
     return opponent_pool.sample()
 
@@ -91,14 +91,14 @@ def choose_opponent(agent):
 file_train_id = random.randint(1000, 9999)
 wins_per_50_ep = 0
 total_steps = 0
-for episode in range(1300):
+for episode in range(10000):
     state, info = env.reset()
     episode_step = 1
     episode_reward = 0
     agent_first = random.randint(0, 1)
 
-    if train_mode == 'selfplay':
-        opponent = choose_opponent(agent)
+    # if train_mode == 'selfplay':
+    opponent = choose_opponent(agent)
 
     done = False
     while not done:
@@ -112,7 +112,13 @@ for episode in range(1300):
             if train_mode == 'random':
                 # 1. random opponent action
                 action = env.sample_action()
-            elif train_mode == 'minimax':
+            # elif train_mode == 'minimax':
+            #     # 2. minimax opponent action
+            #     action = minimax_agent.select_action(state, env, info["action_mask"])
+            # else:
+            #     # 3. past version opponent action
+            #     action = opponent.select_action(state, env, info["action_mask"])
+            if random.random() < 0.2:
                 # 2. minimax opponent action
                 action = minimax_agent.select_action(state, env, info["action_mask"])
             else:
@@ -158,12 +164,17 @@ for episode in range(1300):
                 print(f"Checkpoint saved at {checkpoint_path}")
                 print()
         else:
-            # eval_score = eval.evaluate(agent)
             print(f"Opponent pool size: {len(opponent_pool.loaded)}")
-            # print(f"Evaluation against best_model.pth: {eval_score}/50")
+            print('Wins per 50 episodes:', wins_per_50_ep)
+            # Gate saving on both benchmarks: better than the past versions and
+            # at least even against search. The minimax games are the slow half,
+            # so only play them when the checkpoint pool has already been passed.
+            pool_pct = eval.evaluate_vs_checkpoints(agent)
+            minimax_pct = eval.evaluate_vs_minimax(agent) if pool_pct > 70 else 0.0
+            print(f"vs eval checkpoints: {pool_pct:.1f}% · vs minimax depth 4: {minimax_pct:.1f}%")
             print()
-            # eval_score >= 26 and 
-            if wins_per_50_ep >= 10:
+
+            if pool_pct > 70 and minimax_pct >= 50:
                 checkpoint_path = Path(config.CHECKPOINT_DIR) / f"ep_{episode + 1}_{file_train_id}_minimax.pth"
                 agent.save(checkpoint_path)
                 print(f"Checkpoint saved at {checkpoint_path}")

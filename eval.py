@@ -7,6 +7,10 @@ loop:
 
     wins = evaluate(agent)
     print(f"{wins}/50 vs the eval pool")
+
+`evaluate_vs_checkpoints` and `evaluate_vs_minimax` split those two opponents
+apart and report a win percentage each, so the training loop can gate saving on
+both ("beats the past versions AND holds its own against search").
 """
 
 import random
@@ -39,6 +43,62 @@ def _load_opponent(path):
     return _opponents[path]
 
 
+def _play_game(agent, rival, env, agent_player):
+    """One greedy game; returns the winner (1/-1/0) in env-seat terms."""
+    state, info = env.reset()
+
+    while True:
+        mover = agent if env.current_player == agent_player else rival
+        action = mover.select_action(state, env, info["action_mask"])
+        state, _reward, terminated, truncated, info = env.step(action)
+
+        if terminated or truncated:
+            return info["winner"]
+
+
+def _match(agent, rivals, env):
+    """Play every rival twice -- once opening, once replying. Returns win %."""
+    saved_epsilon = agent.epsilon
+    agent.epsilon = 0.0  # no exploration while measuring
+    wins = 0
+    games = 0
+
+    try:
+        for rival in rivals:
+            for agent_player in (1, -1):  # play both seats against each rival
+                winner = _play_game(agent, rival, env, agent_player)
+                wins += winner == agent_player
+                games += 1
+    finally:
+        agent.epsilon = saved_epsilon
+
+    return 100.0 * wins / games if games else 0.0
+
+
+def evaluate_vs_checkpoints(agent):
+    """Win % over two games against every checkpoint in `eval_checkpoint/`.
+
+    Each opponent is faced twice, once from each seat, since moving first is an
+    advantage -- 11 checkpoints means 22 games. Draws and losses both count as
+    "not a win". Falls back to a single random opponent when the folder is empty.
+    """
+    paths = sorted(EVAL_CHECKPOINT_DIR.glob("*.pth"))
+    rivals = [_load_opponent(path) for path in paths] or [_RandomOpponent()]
+
+    return _match(agent, rivals, environment.Connect4Env())
+
+
+def evaluate_vs_minimax(agent, games=20, depth=4):
+    """Win % over `games` games against a depth-`depth` minimax agent.
+
+    Half the games are played from each seat, so 20 games means 10 opening and
+    10 replying.
+    """
+    rival = minimax.MinimaxAgent(depth=depth)
+
+    return _match(agent, [rival] * (games // 2), environment.Connect4Env())
+
+
 def evaluate(agent, games=50, opponent=None):
     """Play `games` greedy games against the eval pool; return the agent's wins.
 
@@ -58,12 +118,12 @@ def evaluate(agent, games=50, opponent=None):
         for game in range(games):
             # Alternate opponent type every two games, so each of them is faced
             # from both seats equally often.
-            # use_minimax = (game // 2) % 2 == 0
+            use_minimax = (game // 2) % 2 == 0
 
             if opponent is not None:
                 rival = opponent
-            # elif use_minimax:
-            #     rival = _minimax_opponent
+            elif use_minimax:
+                rival = _minimax_opponent
             elif paths:
                 rival = _load_opponent(random.choice(paths))
             else:
@@ -92,3 +152,5 @@ if __name__ == "__main__":
     agent = Agent()
     agent.load(f"{config.CHECKPOINT_DIR}/best_model.pth")
     print(f"{evaluate(agent)}/50 wins vs the eval pool")
+    print(f"{evaluate_vs_checkpoints(agent):.1f}% vs the eval checkpoints")
+    print(f"{evaluate_vs_minimax(agent):.1f}% vs minimax depth 4")

@@ -108,7 +108,7 @@ class Agent:
 
     def update_epsilon(self, total_steps):
         frac = min(1.0, total_steps / config.EPSILON_DECAY_STEPS)
-        self.epsilon = 0.6 + frac * (config.EPSILON_MIN - 0.6)
+        self.epsilon = 0.05 + frac * (config.EPSILON_MIN - 0.05)
 
     def save(self, path):
         torch.save({
